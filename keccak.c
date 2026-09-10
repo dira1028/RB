@@ -70,7 +70,11 @@ void theta(uint64_t *state)
     /* 1단계: 각 열 x 에 대하여 5개의 행 y 값을 모두 XOR 하여 C[x] 계산 */
     for (x = 0; x < 5; x++)
     {
-        /* [TODO] C[x] 계산 */
+        C[x] = 0;
+        for (y = 0; y < 5; y++)
+        {
+            C[x] ^= state[x + 5*y]; 
+        }
     }
 
     /* 2단계: C 배열을 이용해 D[x] 계산
@@ -273,67 +277,15 @@ int keccak_absorb(uint8_t *input, int inLen, int rate, int capacity)
     return SHA3_OK;
 }
 
-/* ===========================================================================
- *  [문제 8] keccak_squeeze
- *  ---------------------------------------------------------------------------
- *  최초 호출 시 패딩(pad10*1)을 적용하고 keccakf 를 수행한 뒤,
- *  rate 영역에서 outLen 바이트를 순차적으로 읽어 낸다.
- *  outLen 이 rate 보다 크면 rate 만큼 뽑을 때마다 keccakf 를 다시 수행한다.
- *
- *  pad_byte : PAD_SHA3(0x06) / PAD_SHAKE(0x1F) / PAD_KECCAK(0x01)
- * ========================================================================= */
-int keccak_squeeze(uint8_t *output, int outLen, int rate, int capacity,
-                   uint8_t pad_byte)
-{
-    uint8_t *out_buf     = output;
-    int      iLen        = outLen;
-    int      rateInBytes = rate / 8;
 
-    /* 64비트 상태 배열을 바이트 단위로 읽기 위한 포인터 */
-    uint8_t *state_bytes = (uint8_t *)keccak_state;
-
-    int blockSize = 0;
-
-    /* ---- 파라미터 검증 (제공됨) ---- */
-    if ((rate + capacity) != KECCAK_SPONGE_BIT)
-        return SHA3_PARAMETER_ERROR;
-
-    if (((rate % 8) != 0) || (rate < 1))
-        return SHA3_PARAMETER_ERROR;
-
-    /* Squeeze 단계로 처음 진입하는 경우: 패딩(Padding) 수행 */
-    if (!is_squeezing)
-    {
-        /* [TODO] end_offset 위치에 패딩 시작 바이트(pad_byte) XOR */
-
-        /* [TODO] rate 영역의 마지막 바이트(rateInBytes - 1)에 0x80 XOR */
-
-        /* [TODO] 패딩이 끝났으므로 내부 상태를 섞음 (keccakf 호출) */
-
-        /* 출력(Squeeze)을 위해 오프셋 초기화 및 상태 변경 */
-        end_offset  = 0;
-        is_squeezing = 1;
+static void keccak_squeezeblocks(uint8_t *h, size_t nblocks,
+                                 uint64_t *s, uint32_t r) {
+    while (nblocks > 0) {
+        KeccakF1600_StatePermute(s);
+        for (size_t i = 0; i < (r >> 3); i++) {
+            store64(h + 8 * i, s[i]);
+        }
+        h += r;
+        nblocks--;
     }
-
-    /* 출력 버퍼(output)에 해시값 짜내기 */
-    while (iLen > 0)
-    {
-        /* 남은 출력 길이와, 현재 블록에서 뽑아낼 수 있는 최대 길이 비교 */
-        blockSize = ((iLen < (rateInBytes - end_offset))
-                        ? iLen
-                        : (rateInBytes - end_offset));
-
-        /* [TODO] state_bytes + end_offset 에서 blockSize 바이트를
-         *        out_buf 로 복사 (memcpy 또는 for 문)                      */
-
-        out_buf    += blockSize;
-        iLen       -= blockSize;
-        end_offset += blockSize;
-
-        /* [TODO] end_offset == rateInBytes 라면 keccakf 를 다시 호출하고
-         *        end_offset 을 0 으로 초기화                               */
-    }
-
-    (void)state_bytes; (void)pad_byte;
-    return SHA3_OK;
 }
